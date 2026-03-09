@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Nam Song View Garden Resort</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700&family=Noto+Serif+Lao:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- ═══════════════════════════════════════════════════
+  FIREBASE — paste your config values in the object below
+  See the guide at the bottom of this file for help
+═══════════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push,
+         onValue, remove, set }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+/* ⬇️  STEP 5: replace every "PASTE_…" with your real values */
+const firebaseConfig = {
+  apiKey:            "AIzaSyBShgzokJ0O7LpoZnAMoFREmGFapfTo9ew",
+  authDomain:        "namsongview-82da8.firebaseapp.com",
+  databaseURL:       "https://namsongview-82da8-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "namsongview-82da8",
+  storageBucket:     "namsongview-82da8.firebasestorage.app",
+  messagingSenderId: "454606477287",
+  appId:             "1:454606477287:web:96b165a2235021f6404f42"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+/* expose to global non-module functions */
+window._db        = db;
+window._ref       = ref;
+window._push      = push;
+window._set       = set;
+window._remove    = remove;
+window._fbReady   = true;
+
+/* real-time listener: bookings */
+onValue(ref(db, 'bookings'), snap => {
+  window.bookings = [];
+  snap.forEach(child => window.bookings.push({ ...child.val(), _fk: child.key }));
+  window.bookings.reverse();
+  if (window._appReady) { renderHistory(); renderDashboard(); renderRoomGrid(); }
+});
+
+/* real-time listener: PIN */
+onValue(ref(db, 'settings/pin'), snap => {
+  window._pin = snap.exists() ? snap.val() : '1234';
+  if (!snap.exists()) set(ref(db, 'settings/pin'), '1234');
+});
+
+console.log('🔥 Firebase connected');
+</script>
+
+<style>
+:root{
+  --gr:#1a6b4a; --grl:#2d8f63; --grd:#0f4530;
+  --ac:#e8a020; --acl:#f5c04a;
+  --bg:#f5f0e8; --card:#fff; --txt:#1a1a1a; --muted:#666;
+  --bdr:#d4c9b0; --red:#c0392b; --ok:#27ae60;
+  --sh:0 4px 20px rgba(0,0,0,.08); --r:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans Lao',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding-bottom:50px}
+
+/* ── PIN ── */
+#pinScreen{position:fixed;inset:0;background:linear-gradient(160deg,var(--grd),var(--gr));display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:30px 20px}
+#pinScreen.hidden{display:none}
+.pin-logo{font-size:3rem;margin-bottom:6px}
+.pin-title{font-family:'Noto Serif Lao',serif;color:#fff;font-size:1.2rem;font-weight:700;text-align:center}
+.pin-sub{color:rgba(255,255,255,.7);font-size:.82rem;margin:4px 0 28px;text-align:center;line-height:1.6}
+.pin-dots{display:flex;gap:14px;margin-bottom:28px}
+.pin-dot{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.25);transition:all .15s}
+.pin-dot.on{background:var(--acl);transform:scale(1.15)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:240px}
+.pk{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:14px;padding:18px 0;font-size:1.3rem;font-weight:600;cursor:pointer;text-align:center;font-family:'Noto Sans Lao',sans-serif;transition:all .15s}
+.pk:active{background:rgba(255,255,255,.28);transform:scale(.95)}
+.pk.del{font-size:1rem}
+.pin-err{color:#ff8a8a;font-size:.82rem;margin-top:14px;min-height:20px;text-align:center}
+.pin-link{color:rgba(255,255,255,.5);font-size:.75rem;margin-top:20px;cursor:pointer;text-decoration:underline}
+
+/* ── HEADER ── */
+.hdr{background:linear-gradient(135deg,var(--grd),var(--gr) 60%,var(--grl));color:#fff;padding:20px 20px 16px;text-align:center;position:relative;overflow:hidden}
+.hdr::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06)}
+.hdr::after{content:'';position:absolute;bottom:-30px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(232,160,32,.15)}
+.hdr h1{font-family:'Noto Serif Lao',serif;font-size:1.3rem;font-weight:700;position:relative;z-index:1}
+.hdr p{font-size:.8rem;opacity:.85;margin-top:2px;position:relative;z-index:1}
+.hdr-lock{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:5px 10px;font-size:.72rem;cursor:pointer;font-family:'Noto Sans Lao',sans-serif;z-index:2}
+.hdr-sync{position:absolute;top:14px;left:14px;width:9px;height:9px;border-radius:50%;background:var(--ok);z-index:2}
+.hdr-sync.spin{background:var(--ac);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── TABS ── */
+.tabs{display:flex;background:var(--grd);border-bottom:3px solid var(--ac);overflow-x:auto}
+.tab{flex:1;min-width:70px;padding:10px 4px;text-align:center;color:rgba(255,255,255,.6);font-size:.7rem;font-weight:500;cursor:pointer;transition:all .2s;border:none;background:none;white-space:nowrap}
+.tab.active{color:var(--acl);background:rgba(255,255,255,.08);border-bottom:3px solid var(--ac);margin-bottom:-3px}
+.tab-ic{display:block;font-size:1.1rem;margin-bottom:2px}
+
+/* ── SECTIONS ── */
+.sec{display:none;padding:16px}.sec.active{display:block}
+
+/* ── CARDS ── */
+.card{background:var(--card);border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:var(--sh);border:1px solid rgba(212,201,176,.4)}
+.ct{font-family:'Noto Serif Lao',serif;font-size:1rem;font-weight:700;color:var(--gr);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.ctl{flex:1;height:1px;background:linear-gradient(to right,var(--bdr),transparent)}
+
+/* ── INPUTS ── */
+label{display:block;font-size:.82rem;font-weight:600;color:var(--grd);margin-bottom:5px}
+input,textarea,select{width:100%;padding:11px 14px;border:1.5px solid var(--bdr);border-radius:10px;font-family:'Noto Sans Lao',sans-serif;font-size:.9rem;color:var(--txt);background:#fafaf7;transition:border-color .2s;margin-bottom:12px;-webkit-appearance:none}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gr);box-shadow:0 0 0 3px rgba(26,107,74,.12);background:#fff}
+textarea{resize:vertical;min-height:70px}
+
+/* ── ROOM GRID ── */
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rc{border:2px solid var(--bdr);border-radius:12px;padding:10px 8px;cursor:pointer;transition:all .2s;background:#fafaf7;text-align:center;position:relative}
+.rc:active{transform:scale(.97)}
+.rc.sel{border-color:var(--gr);background:rgba(26,107,74,.07)}
+.rc.sel::after{content:'✓';position:absolute;top:4px;right:6px;color:var(--gr);font-weight:700;font-size:.75rem}
+.rc.occ{border-color:#e74c3c;background:#fff5f5;cursor:default;opacity:.7}
+.rc.occ::after{content:'🔴';position:absolute;top:4px;right:4px;font-size:.68rem}
+.rnum{font-size:1rem;font-weight:700;color:var(--grd)}
+.rtype{font-size:.7rem;color:var(--muted);margin:2px 0}
+.rprice{font-size:.75rem;font-weight:600;color:var(--ac)}
+
+/* ── SELECTED ROOMS ── */
+.sri{background:linear-gradient(135deg,rgba(26,107,74,.05),rgba(26,107,74,.02));border:1.5px solid rgba(26,107,74,.2);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.srh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.srn{font-weight:600;font-size:.88rem;color:var(--grd)}
+.rm-btn{background:#fff0ee;border:1px solid #f0a898;color:var(--red);border-radius:8px;padding:3px 8px;font-size:.75rem;cursor:pointer;font-family:'Noto Sans Lao',sans-serif}
+.dr{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dr label{font-size:.75rem}
+.dr input{margin-bottom:0;font-size:.82rem}
+.nb{display:inline-block;background:var(--gr);color:#fff;border-radius:20px;padding:2px 10px;font-size:.72rem;margin-top:6px}
+.rsub{text-align:right;font-weight:700;font-size:.9rem;color:var(--grd);margin-top:4px}
+
+/* ── BUTTONS ── */
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-family:'Noto Sans Lao',sans-serif;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;margin-bottom:10px}
+.btn:active{transform:scale(.98)}
+.btn-p{background:linear-gradient(135deg,var(--gr),var(--grl));color:#fff;box-shadow:0 4px 15px rgba(26,107,74,.3)}
+.btn-a{background:linear-gradient(135deg,var(--ac),var(--acl));color:#fff;box-shadow:0 4px 15px rgba(232,160,32,.3)}
+.btn-o{background:#fff;color:var(--gr);border:2px solid var(--gr)}
+.btn-sm{padding:9px 14px;font-size:.85rem;width:auto;display:inline-block;margin-bottom:0}
+
+/* ── SUMMARY ── */
+.st{width:100%;border-collapse:collapse;font-size:.85rem}
+.st td{padding:7px 4px}
+.st tr:not(:last-child) td{border-bottom:1px solid #eee}
+.st .tr td{font-weight:700;font-size:1rem;color:var(--grd);padding-top:12px;border-top:2px solid var(--gr)}
+.st td:last-child{text-align:right;font-weight:500}
+
+/* ── INVOICE ── */
+.inv-wrap{background:#fff;border-radius:var(--r);padding:24px 20px;box-shadow:var(--sh);border:1px solid var(--bdr)}
+.ig{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.il{font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.iv{font-size:.88rem;font-weight:600;color:var(--txt);margin-top:2px}
+.it{width:100%;border-collapse:collapse;font-size:.78rem;margin:14px 0}
+.it th{background:var(--gr);color:#fff;padding:8px 6px;text-align:left;font-weight:600}
+.it th:last-child,.it td:last-child{text-align:right}
+.it td{padding:8px 6px;border-bottom:1px solid #eee}
+.itot{border-top:2px solid var(--gr);padding-top:10px;margin-top:4px}
+.itr{display:flex;justify-content:space-between;padding:3px 0;font-size:.83rem}
+.itr.grand{font-weight:700;font-size:1.05rem;color:var(--grd);border-top:1px solid var(--bdr);margin-top:6px;padding-top:8px}
+.ifooter{margin-top:20px;padding-top:14px;border-top:1px dashed var(--bdr);text-align:center;font-size:.75rem;color:var(--muted)}
+.isig{display:flex;justify-content:space-between;margin-top:30px;font-size:.75rem;color:var(--muted)}
+.isig div{text-align:center;min-width:100px}
+.sigline{border-top:1px solid #ccc;padding-top:4px;margin-top:30px}
+.dbt{flex:1;padding:10px 8px;border-radius:10px;font-family:'Noto Sans Lao',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;border:2px solid var(--bdr);background:#fff;color:var(--muted);transition:all .2s}
+.dbta{background:var(--gr);color:#fff;border-color:var(--gr)}
+
+/* ── DASHBOARD ── */
+.dnav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.dnav input{flex:1;margin-bottom:0}
+.dnavbtn{background:var(--gr);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:1.1rem;cursor:pointer}
+.dstat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.dstat{background:#fff;border-radius:12px;padding:12px 8px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.dstat-n{font-size:1.6rem;font-weight:700}
+.dstat-l{font-size:.68rem;color:var(--muted);margin-top:2px}
+.dstat.occ .dstat-n{color:#e74c3c}
+.dstat.cin .dstat-n{color:var(--gr)}
+.dstat.cout .dstat-n{color:var(--ac)}
+.rsg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.rsc{border-radius:12px;padding:10px 12px;border:2px solid}
+.rsc.av{border-color:#b8ddc8;background:#f0faf4}
+.rsc.oc{border-color:#f5b7b1;background:#fff8f7}
+.rsc.ci{border-color:#a9cce3;background:#f0f7fb}
+.rsc.co{border-color:#fdebd0;background:#fffbf5}
+.rs-r{font-weight:700;font-size:.88rem}
+.rs-s{font-size:.68rem;font-weight:600;margin-top:1px}
+.rs-g{font-size:.72rem;color:#555;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs-d{font-size:.68rem;color:#888}
+.ai{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid var(--gr)}
+.ai.out{border-left-color:var(--ac)}
+.aih{display:flex;justify-content:space-between;align-items:center}
+.aig{font-weight:700;font-size:.9rem}
+.aibadge{font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:10px}
+.bin{background:#d5f0e2;color:#1a6b4a}
+.bout{background:#fdebd0;color:#a04000}
+.aim{font-size:.75rem;color:var(--muted);margin-top:3px}
+
+/* ── HISTORY ── */
+.bk{background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid var(--gr)}
+.bkh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.bkg{font-weight:700;font-size:.95rem}
+.bkt{font-weight:700;color:var(--gr);font-size:.95rem}
+.bkm{font-size:.78rem;color:var(--muted)}
+.frow{display:flex;gap:8px;margin-bottom:14px}
+.frow input{margin-bottom:0;flex:1}
+
+/* ── MISC ── */
+.tip{background:#fffbf0;border-left:3px solid var(--ac);padding:8px 12px;border-radius:0 8px 8px 0;font-size:.78rem;color:#7a5a00;margin-bottom:12px}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-ic{font-size:3rem;margin-bottom:10px;opacity:.4}
+.rftabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rft{padding:5px 12px;border-radius:20px;font-size:.75rem;border:1.5px solid var(--bdr);background:#fff;cursor:pointer;font-family:'Noto Sans Lao',sans-serif;color:var(--muted);font-weight:500}
+.rft.active{background:var(--gr);color:#fff;border-color:var(--gr)}
+.disc-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.disc-row input{flex:1;margin-bottom:0}
+.disc-row select{width:90px;margin-bottom:0;flex-shrink:0}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--grd);color:#fff;padding:12px 24px;border-radius:30px;font-size:.88rem;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:9998;transition:transform .3s;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block!important;position:fixed;top:0;left:0;width:100%;background:#fff;z-index:9999;padding:20px}.noprint{display:none!important}}
+#printArea{display:none}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PIN SCREEN ═══════════ -->
+<div id="pinScreen">
+  <div class="pin-logo">🌿</div>
+  <div class="pin-title">Nam Song View Garden Resort</div>
+  <div class="pin-sub">ນ້ຳຊອງວິວກາເດັນຣີສອດ<br>ໃສ່ລະຫັດ PIN ເພື່ອເຂົ້າໃຊ້ງານ</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pk" onclick="pp('1')">1</button>
+    <button class="pk" onclick="pp('2')">2</button>
+    <button class="pk" onclick="pp('3')">3</button>
+    <button class="pk" onclick="pp('4')">4</button>
+    <button class="pk" onclick="pp('5')">5</button>
+    <button class="pk" onclick="pp('6')">6</button>
+    <button class="pk" onclick="pp('7')">7</button>
+    <button class="pk" onclick="pp('8')">8</button>
+    <button class="pk" onclick="pp('9')">9</button>
+    <button class="pk" onclick="pp('0')" style="grid-column:2">0</button>
+    <button class="pk del" onclick="pd()">⌫</button>
+  </div>
+  <div class="pin-err" id="pinErr"></div>
+  <div class="pin-link" onclick="changePin()">ປ່ຽນ PIN</div>
+</div>
+
+<!-- ═══════════ MAIN APP ═══════════ -->
+<div id="app" style="display:none">
+
+<div class="hdr">
+  <div class="hdr-sync noprint" id="syncDot"></div>
+  <button class="hdr-lock noprint" onclick="lockApp()">🔒 ລັອກ</button>
+  <div style="font-size:2rem;margin-bottom:4px">🌿</div>
+  <h1>Nam Song View Garden Resort</h1>
+  <p style="font-size:.88rem;font-weight:600;opacity:.95">ນ້ຳຊອງວິວກາເດັນຣີສອດ</p>
+  <p>ບ້ານພູດິນແດງ · ວັງວຽງ · ວຽງຈັນ</p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('booking',this)"><span class="tab-ic">📋</span>ຈອງຫ້ອງ</button>
+  <button class="tab" onclick="showTab('dashboard',this)"><span class="tab-ic">📊</span>ສະຖານະ</button>
+  <button class="tab" onclick="showTab('invoice',this)"><span class="tab-ic">🧾</span>ໃບເກັບເງິນ</button>
+  <button class="tab" onclick="showTab('history',this)"><span class="tab-ic">📁</span>ປະຫວັດ</button>
+</div>
+
+<!-- ─── BOOKING ─── -->
+<div id="tab-booking" class="sec active">
+  <div class="card">
+    <div class="ct">👤 ຂໍ້ມູນແຂກ <div class="ctl"></div></div>
+    <label>ຊື່ແຂກ *</label>
+    <input type="text" id="gName" placeholder="ກະລຸນາໃສ່ຊື່ແຂກ">
+    <label>ເບີໂທ</label>
+    <input type="tel" id="gPhone" placeholder="020 XXXX XXXX">
+    <label>ສັນຊາດ</label>
+    <input type="text" id="gNation" placeholder="ລາວ, ໄທ, ຈີນ, ຝລັ່ງ...">
+    <label>ໝາຍເຫດ</label>
+    <textarea id="gNote" placeholder="ຂໍ້ຄວາມພິເສດ..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="ct">🏠 ເລືອກຫ້ອງ <div class="ctl"></div></div>
+    <div class="tip">💡 ຫ້ອງສີແດງ = ຖືກຈອງໃນຊ່ວງວັນນີ້ແລ້ວ</div>
+    <div class="rftabs">
+      <button class="rft active" onclick="filterRooms('all',this)">ທັງໝົດ</button>
+      <button class="rft" onclick="filterRooms('A',this)">ຕຶກ A</button>
+      <button class="rft" onclick="filterRooms('B',this)">ຕຶກ B</button>
+      <button class="rft" onclick="filterRooms('C',this)">ຕຶກ C</button>
+      <button class="rft" onclick="filterRooms('D',this)">ຕຶກ D</button>
+    </div>
+    <div class="rgrid" id="roomGrid"></div>
+  </div>
+
+  <div class="card" id="srCard" style="display:none">
+    <div class="ct">📅 ວັນທີເຂົ້າ-ອອກ <div class="ctl"></div></div>
+    <div class="tip">💡 ສາມາດຕັ້ງວັນທີຕ່າງກັນໃນແຕ່ລະຫ້ອງ</div>
+    <div id="srList"></div>
+  </div>
+
+  <div class="card" id="discCard" style="display:none">
+    <div class="ct">🏷️ ສ່ວນຫຼຸດ <div class="ctl"></div></div>
+    <div class="disc-row">
+      <input type="number" id="discVal" placeholder="0" min="0">
+      <select id="discType"><option value="kip">ກີບ</option><option value="pct">%</option></select>
+    </div>
+  </div>
+
+  <div class="card" id="sumCard" style="display:none">
+    <div class="ct">💰 ສະຫຼຸບລາຄາ <div class="ctl"></div></div>
+    <table class="st" id="sumTable"></table>
+  </div>
+
+  <button class="btn btn-a" onclick="genInvoice()" id="genBtn" style="display:none">🧾 ສ້າງໃບເກັບເງິນ</button>
+  <button class="btn btn-p" onclick="saveBooking()" id="saveBtn" style="display:none">☁️ ບັນທຶກ & ອັບໂຫລດ</button>
+</div>
+
+<!-- ─── DASHBOARD ─── -->
+<div id="tab-dashboard" class="sec">
+  <div class="card">
+    <div class="ct">📅 ເລືອກວັນທີ <div class="ctl"></div></div>
+    <div class="dnav">
+      <button class="dnavbtn" onclick="dDay(-1)">‹</button>
+      <input type="date" id="dashDate" onchange="renderDashboard()">
+      <button class="dnavbtn" onclick="dDay(1)">›</button>
+    </div>
+    <div class="dstat-row">
+      <div class="dstat occ"><div class="dstat-n" id="stOcc">0</div><div class="dstat-l">ຫ້ອງທີ່ພັກ</div></div>
+      <div class="dstat cin"><div class="dstat-n" id="stCin">0</div><div class="dstat-l">Check-in</div></div>
+      <div class="dstat cout"><div class="dstat-n" id="stCout">0</div><div class="dstat-l">Check-out</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">🏠 ສະຖານະຫ້ອງ <div class="ctl"></div></div>
+    <div class="rsg" id="roomStatusGrid"></div>
+  </div>
+  <div class="card">
+    <div class="ct">📋 ການເຂົ້າ-ອອກ <div class="ctl"></div></div>
+    <div id="arrList"></div>
+  </div>
+</div>
+
+<!-- ─── INVOICE ─── -->
+<div id="tab-invoice" class="sec">
+  <div id="invEmpty" class="empty">
+    <div class="empty-ic">🧾</div>
+    <p>ຍັງບໍ່ໄດ້ສ້າງໃບເກັບເງິນ<br>ໄປທີ່ "ຈອງຫ້ອງ" ກ່ອນ</p>
+  </div>
+  <div id="invContent" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:12px" class="noprint">
+      <button id="btnINV" class="dbt dbta" onclick="switchDoc('inv')">🧾 ໃບເກັບເງິນ</button>
+      <button id="btnQUO" class="dbt" onclick="switchDoc('quo')">📄 ໃບສະເໜີລາຄາ</button>
+    </div>
+    <div class="inv-wrap" id="invPreview"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap" class="noprint">
+      <button class="btn btn-p btn-sm" onclick="doPrint()">🖨️ ພິມ</button>
+      <button class="btn btn-o btn-sm" onclick="doShare()">📤 ແຊ / Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── HISTORY ─── -->
+<div id="tab-history" class="sec">
+  <div class="frow">
+    <input type="text" id="srchInput" placeholder="🔍 ຄົ້ນຫາຊື່ແຂກ..." oninput="renderHistory()">
+    <input type="date" id="srchDate" oninput="renderHistory()">
+  </div>
+  <div id="histList"></div>
+</div>
+
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+// ═══════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════
+const ROOMS=[
+  {id:'A01',type:'ຕຽງຄູ່',price:600000},{id:'A02',type:'ຕຽງຄູ່',price:600000},
+  {id:'A03',type:'ຕຽງດ່ຽວ',price:600000},{id:'A04',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'A05',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'B06',type:'ຕຽງດ່ຽວ',price:600000},{id:'B07',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'B08',type:'ຕຽງດ່ຽວ',price:600000},{id:'B09',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'B10',type:'ຕຽງດ່ຽວ',price:600000},{id:'B11',type:'ຕຽງຄູ່',price:600000},
+  {id:'B12',type:'ຕຽງຄູ່',price:600000},{id:'B13',type:'Family',price:700000},
+  {id:'B14',type:'Family',price:700000},{id:'B15',type:'Family',price:700000},
+  {id:'C16',type:'ຕຽງຄູ່',price:600000},{id:'C17',type:'ຕຽງຄູ່',price:600000},
+  {id:'C18',type:'ຕຽງດ່ຽວ',price:600000},{id:'C19',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'C20',type:'ຕຽງດ່ຽວ',price:600000},{id:'C21',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'C22',type:'ຕຽງດ່ຽວ',price:600000},{id:'C23',type:'ຕຽງດ່ຽວ',price:600000},
+  {id:'C24',type:'ຕຽງຄູ່',price:600000},{id:'C25',type:'ຕຽງຄູ່',price:600000},
+  {id:'D26',type:'ຕຽງຄູ່',price:500000},{id:'D27',type:'ຕຽງຄູ່',price:500000},
+  {id:'D28',type:'Family',price:500000},{id:'D29',type:'Family',price:500000},
+  {id:'D30',type:'Family',price:500000},{id:'D31',type:'Family',price:500000},
+  {id:'D33',type:'Family',price:500000},
+];
+const R={
+  en:'Nam Song View Garden Resort',lo:'ນ້ຳຊອງວິວກາເດັນຣີສອດ',
+  addrEn:'Ban Phoudindeng, Vang Vieng District, Vientiane Province',
+  addrLo:'ບ້ານພູດິນແດງ, ເມືອງວັງວຽງ, ແຂວງວຽງຈັນ',
+  t1:'030 987 0099',t2:'020 9595 9598',email:'NAMSONGVIEW@GMAIL.COM'
+};
+
+window.bookings=[];
+let selRooms={}, curInv=null, isQuo=false, bld='all', pinBuf='';
+
+// ═══════════════════════════════════════
+// PIN
+// ═══════════════════════════════════════
+function pp(d){
+  if(pinBuf.length>=4)return;
+  pinBuf+=d; updDots();
+  if(pinBuf.length===4)setTimeout(chkPin,200);
+}
+function pd(){ pinBuf=pinBuf.slice(0,-1); updDots(); document.getElementById('pinErr').textContent=''; }
+function updDots(){ for(let i=0;i<4;i++) document.getElementById('pd'+i).classList.toggle('on',i<pinBuf.length); }
+function chkPin(){
+  if(pinBuf===(window._pin||'1234')){
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('app').style.display='block';
+    sessionStorage.setItem('ok','1');
+  } else {
+    document.getElementById('pinErr').textContent='❌ ລະຫັດບໍ່ຖືກ. ລອງໃໝ່.';
+    pinBuf=''; updDots();
+  }
+}
+function lockApp(){
+  sessionStorage.removeItem('ok');
+  document.getElementById('pinScreen').classList.remove('hidden');
+  document.getElementById('app').style.display='none';
+  pinBuf=''; updDots(); document.getElementById('pinErr').textContent='';
+}
+function changePin(){
+  const old=prompt('ໃສ່ PIN ເກົ່າ:');
+  if(old!==(window._pin||'1234')){alert('PIN ເກົ່າບໍ່ຖືກ!');return;}
+  const n=prompt('PIN ໃໝ່ (4 ຕົວເລກ):');
+  if(!n||!/^\d{4}$/.test(n)){alert('PIN ຕ້ອງເປັນ 4 ຕົວເລກ!');return;}
+  if(prompt('ຢືນຢັນ PIN ໃໝ່:')!==n){alert('PIN ບໍ່ຕົງກັນ!');return;}
+  if(window._fbReady){ window._set(window._ref(window._db,'settings/pin'),n); window._pin=n; }
+  alert('✅ ປ່ຽນ PIN ສຳເລັດ!');
+}
+
+// ═══════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════
+function showTab(name,btn){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='history') renderHistory();
+  if(name==='dashboard') renderDashboard();
+}
+function goTab(name){
+  const tabs=['booking','dashboard','invoice','history'];
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.tab')[tabs.indexOf(name)]?.classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+function dDay(d){
+  const dt=new Date(document.getElementById('dashDate').value||new Date());
+  dt.setDate(dt.getDate()+d);
+  document.getElementById('dashDate').value=dt.toISOString().split('T')[0];
+  renderDashboard();
+}
+function renderDashboard(){
+  const date=document.getElementById('dashDate').value||today();
+  const st={}, events=[];
+  ROOMS.forEach(r=>st[r.id]={s:'av',guest:'',ci:'',co:''});
+  let cntOcc=0,cntCin=0,cntCout=0;
+
+  (window.bookings||[]).forEach(b=>{
+    (b.rooms||[]).forEach(r=>{
+      if(date>=r.checkin&&date<r.checkout){
+        const s=r.checkin===date?'ci':'oc';
+        st[r.id]={s,guest:b.guest,ci:r.checkin,co:r.checkout};
+        if(s==='ci') cntCin++; else cntOcc++;
+      } else if(r.checkout===date){
+        if(st[r.id].s==='av') st[r.id]={s:'co',guest:b.guest,ci:r.checkin,co:r.checkout};
+        cntCout++;
+      }
+    });
+    (b.rooms||[]).forEach(r=>{
+      if(r.checkin===date) events.push({t:'in',guest:b.guest,room:r.id,phone:b.phone,nation:b.nation,co:r.checkout});
+      if(r.checkout===date) events.push({t:'out',guest:b.guest,room:r.id,ci:r.checkin});
+    });
+  });
+
+  document.getElementById('stOcc').textContent=cntOcc;
+  document.getElementById('stCin').textContent=cntCin;
+  document.getElementById('stCout').textContent=cntCout;
+
+  const lbl={av:'✅ ຫວ່າງ',oc:'🔴 ມີແຂກ',ci:'🟢 Check-in',co:'🟡 Check-out'};
+  const cls={av:'av',oc:'oc',ci:'ci',co:'co'};
+  document.getElementById('roomStatusGrid').innerHTML=ROOMS.map(rm=>{
+    const s=st[rm.id];
+    return`<div class="rsc ${cls[s.s]}">
+      <div class="rs-r">${rm.id}</div>
+      <div class="rs-s">${lbl[s.s]}</div>
+      ${s.guest?`<div class="rs-g">👤 ${s.guest}</div>`:''}
+      ${s.ci?`<div class="rs-d">${fd(s.ci)} → ${fd(s.co)}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const al=document.getElementById('arrList');
+  if(!events.length){
+    al.innerHTML=`<div class="empty" style="padding:20px"><div class="empty-ic" style="font-size:2rem">😴</div><p>ບໍ່ມີການເຂົ້າ-ອອກ ວັນທີ ${fd(date)}</p></div>`;
+  } else {
+    // de-duplicate
+    const seen=new Set();
+    const uniq=events.filter(e=>{const k=e.t+e.guest+e.room;if(seen.has(k))return false;seen.add(k);return true;});
+    al.innerHTML=uniq.map(e=>`
+      <div class="ai ${e.t==='out'?'out':''}">
+        <div class="aih">
+          <div class="aig">👤 ${e.guest}</div>
+          <span class="aibadge ${e.t==='in'?'bin':'bout'}">${e.t==='in'?'⬇️ Check-in':'⬆️ Check-out'}</span>
+        </div>
+        <div class="aim">🏠 ${e.room} ${e.t==='in'?'· ອອກ: '+fd(e.co):'· ເຂົ້າ: '+fd(e.ci)} ${e.phone?'· 📞'+e.phone:''} ${e.nation?'· 🌏'+e.nation:''}</div>
+      </div>`).join('');
+  }
+}
+
+// ═══════════════════════════════════════
+// ROOM GRID
+// ═══════════════════════════════════════
+function filterRooms(b,btn){
+  bld=b;
+  document.querySelectorAll('.rft').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  renderRoomGrid();
+}
+function occupiedToday(){
+  const td=today(), set=new Set();
+  (window.bookings||[]).forEach(b=>(b.rooms||[]).forEach(r=>{ if(td>=r.checkin&&td<r.checkout) set.add(r.id); }));
+  return set;
+}
+function renderRoomGrid(){
+  const list=bld==='all'?ROOMS:ROOMS.filter(r=>r.id.startsWith(bld));
+  const occ=occupiedToday();
+  document.getElementById('roomGrid').innerHTML=list.map(rm=>{
+    const isSel=selRooms[rm.id]!==undefined;
+    const isOcc=occ.has(rm.id)&&!isSel;
+    return`<div class="rc ${isSel?'sel':''} ${isOcc?'occ':''}" onclick="toggleRoom('${rm.id}')">
+      <div class="rnum">${rm.id}</div>
+      <div class="rtype">${rm.type}</div>
+      <div class="rprice">${fk(rm.price)}</div>
+      ${isOcc?'<div style="font-size:.6rem;color:#e74c3c">ຈອງແລ້ວ</div>':''}
+    </div>`;
+  }).join('');
+}
+function toggleRoom(id){
+  if(selRooms[id]!==undefined) delete selRooms[id];
+  else { const t=today(),tm=new Date(Date.now()+86400000).toISOString().split('T')[0]; selRooms[id]={ci:t,co:tm}; }
+  renderRoomGrid(); renderSelRooms(); updateSum();
+}
+
+// ═══════════════════════════════════════
+// SELECTED ROOMS
+// ═══════════════════════════════════════
+function renderSelRooms(){
+  const ids=Object.keys(selRooms), show=ids.length>0;
+  ['srCard','discCard','sumCard','genBtn','saveBtn'].forEach(id=>document.getElementById(id).style.display=show?'block':'none');
+  if(!show) return;
+  document.getElementById('srList').innerHTML=ids.map(rid=>{
+    const rm=ROOMS.find(r=>r.id===rid), d=selRooms[rid], n=nights(d.ci,d.co);
+    return`<div class="sri">
+      <div class="srh">
+        <div class="srn">🏠 ${rm.id} — ${rm.type}</div>
+        <button class="rm-btn" onclick="removeRoom('${rid}')">✕ ລຶບ</button>
+      </div>
+      <div class="dr">
+        <div><label>ວັນທີເຂົ້າ</label><input type="date" value="${d.ci}" onchange="updDate('${rid}','ci',this.value)"></div>
+        <div><label>ວັນທີອອກ</label><input type="date" value="${d.co}" onchange="updDate('${rid}','co',this.value)"></div>
+      </div>
+      ${n>0?`<span class="nb">🌙 ${n} ຄືນ</span>`:'<span class="nb" style="background:var(--red)">⚠️ ວັນທີບໍ່ຖືກ</span>'}
+      <div class="rsub">${fk(n>0?n*rm.price:0)} ກີບ</div>
+    </div>`;
+  }).join('');
+}
+function removeRoom(id){ delete selRooms[id]; renderRoomGrid(); renderSelRooms(); updateSum(); }
+function updDate(id,f,v){ selRooms[id][f]=v; renderSelRooms(); updateSum(); }
+function updateSum(){
+  const ids=Object.keys(selRooms); if(!ids.length) return;
+  let sub=0, rows='';
+  ids.forEach(rid=>{
+    const rm=ROOMS.find(r=>r.id===rid), n=nights(selRooms[rid].ci,selRooms[rid].co), amt=n*rm.price;
+    sub+=amt;
+    rows+=`<tr><td>${rm.id} (${rm.type})</td><td>${n} ຄືນ × ${fk(rm.price)}</td></tr>
+           <tr><td colspan="2" style="text-align:right;font-weight:600">${fk(amt)} ກີບ</td></tr>`;
+  });
+  const disc=getDisc(sub), tot=sub-disc;
+  if(disc>0) rows+=`<tr><td style="color:var(--red)">ສ່ວນຫຼຸດ</td><td style="text-align:right;color:var(--red)">-${fk(disc)} ກີບ</td></tr>`;
+  rows+=`<tr class="tr"><td>💰 ລວມທັງໝົດ</td><td>${fk(tot)} ກີບ</td></tr>`;
+  document.getElementById('sumTable').innerHTML=rows;
+}
+document.addEventListener('input',e=>{ if(['discVal','discType'].includes(e.target.id)) updateSum(); });
+function getDisc(sub){ const v=parseFloat(document.getElementById('discVal').value)||0; return document.getElementById('discType').value==='pct'?Math.round(sub*v/100):v; }
+
+// ═══════════════════════════════════════
+// GENERATE INVOICE
+// ═══════════════════════════════════════
+function genInvoice(){
+  const name=document.getElementById('gName').value.trim();
+  if(!name){toast('⚠️ ກະລຸນາໃສ່ຊື່ແຂກ');return;}
+  const ids=Object.keys(selRooms);
+  if(!ids.length){toast('⚠️ ກະລຸນາເລືອກຫ້ອງ');return;}
+  for(const id of ids){ if(nights(selRooms[id].ci,selRooms[id].co)<=0){toast('⚠️ ກວດວັນທີຫ້ອງ '+id);return;} }
+  let sub=0;
+  const rms=ids.map(rid=>{
+    const rm=ROOMS.find(r=>r.id===rid), n=nights(selRooms[rid].ci,selRooms[rid].co), amt=n*rm.price;
+    sub+=amt;
+    return{...rm,checkin:selRooms[rid].ci,checkout:selRooms[rid].co,nights:n,amt};
+  });
+  const disc=getDisc(sub), tot=sub-disc;
+  curInv={
+    invNum:'INV-'+Date.now().toString().slice(-6),
+    guest:name, phone:document.getElementById('gPhone').value,
+    nation:document.getElementById('gNation').value, note:document.getElementById('gNote').value,
+    rooms:rms, subtotal:sub, discount:disc, total:tot,
+    createdAt:new Date().toISOString()
+  };
+  isQuo=false; renderInv(); goTab('invoice'); toast('✅ ສ້າງໃບເກັບເງິນສຳເລັດ!');
+}
+function switchDoc(t){
+  isQuo=(t==='quo');
+  document.getElementById('btnINV').className='dbt'+(isQuo?'':' dbta');
+  document.getElementById('btnQUO').className='dbt'+(isQuo?' dbta':'');
+  renderInv();
+}
+
+// ═══════════════════════════════════════
+// SAVE → FIREBASE
+// ═══════════════════════════════════════
+function saveBooking(){
+  if(!curInv){genInvoice();return;}
+  if(!window._fbReady){toast('⚠️ Firebase ຍັງບໍ່ເຊື່ອມຕໍ່');return;}
+  setSyncing(true);
+  window._push(window._ref(window._db,'bookings'),{...curInv,savedAt:new Date().toISOString()})
+    .then(()=>{ toast('✅ ອັບໂຫລດສຳເລັດ! ☁️'); setSyncing(false); })
+    .catch(e=>{ toast('❌ ອັບໂຫລດບໍ່ໄດ້: '+e.message); setSyncing(false); });
+}
+function delBooking(fk){
+  if(!confirm('ລຶບການຈອງນີ້ແທ້ບໍ?')) return;
+  setSyncing(true);
+  window._remove(window._ref(window._db,'bookings/'+fk))
+    .then(()=>{ toast('🗑️ ລຶບສຳເລັດ'); setSyncing(false); })
+    .catch(e=>{ toast('❌ '+e.message); setSyncing(false); });
+}
+function setSyncing(v){ document.getElementById('syncDot').className='hdr-sync noprint'+(v?' spin':''); }
+
+// ═══════════════════════════════════════
+// INVOICE RENDER
+// ═══════════════════════════════════════
+const SIG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60" style="display:block;margin:0 auto 2px">
+  <g fill="none" stroke="#1a1a1a" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14,48 C13,38 13,26 15,17 C16,13 18,10 21,10 C25,9 29,13 28,19 C27,25 23,28 18,28 C15,28 13,27 13,26" stroke-width="2.1"/>
+    <path d="M13,48 C14,42 16,36 18,32 C20,28 23,26 26,27 C29,28 29,34 29,43 L29,48" stroke-width="1.8"/>
+    <path d="M29,35 C31,29 35,27 38,28 C41,30 41,36 41,43 L41,48" stroke-width="1.8"/>
+    <path d="M45,37 C45,31 47,28 51,28 C55,28 57,32 57,37 C57,43 55,47 51,47 C47,47 45,43 45,39" stroke-width="1.8"/>
+    <path d="M60,28 L60,40 C60,44 62,47 65,46 C68,45 69,41 69,37 L69,28" stroke-width="1.8"/>
+    <path d="M72,28 L76,46 L80,28" stroke-width="1.8"/>
+    <path d="M88,36 C87,30 89,28 93,28 C97,28 99,32 98,37 C97,42 95,46 92,46 C89,46 87,44 88,41 L88,48" stroke-width="1.8"/>
+    <path d="M101,28 L101,48" stroke-width="1.8"/>
+    <path d="M101,36 C103,30 107,28 110,29 C113,30 114,35 114,42 L114,48" stroke-width="1.8"/>
+    <path d="M117,12 L117,48" stroke-width="1.8"/>
+    <path d="M117,36 C119,30 123,28 126,29 C129,30 130,35 130,42 L130,48" stroke-width="1.8"/>
+    <path d="M11,53 C45,59 92,60 133,56 C148,54 158,51 165,47 C170,45 173,42 171,40 C169,38 164,39 161,42" stroke-width="1.4" opacity=".65"/>
+  </g>
+</svg>`;
+
+function renderInv(){
+  if(!curInv) return;
+  const inv=curInv;
+  const ci0=inv.rooms.map(r=>r.checkin).sort()[0];
+  const co0=inv.rooms.map(r=>r.checkout).sort().reverse()[0];
+  const dNum=isQuo?inv.invNum.replace('INV-','QUO-'):inv.invNum;
+  const dTitle=isQuo?'ໃບສະເໜີລາຄາ':'ໃບເກັບເງິນ / ໃບຮັບເງິນ';
+  const dTitleEn=isQuo?'QUOTATION':'INVOICE / RECEIPT';
+  const col=isQuo?'#1a5fa8':'#1a6b4a';
+  const bg=isQuo?'#e8f0fc':'rgba(26,107,74,.07)';
+  const dep=Math.round(inv.total*.5), bal=inv.total-dep;
+
+  document.getElementById('invPreview').innerHTML=`
+    <div style="text-align:center;margin-bottom:14px;padding-bottom:14px;border-bottom:3px double ${col}">
+      <div style="font-size:1.4rem;margin-bottom:4px">🌿</div>
+      <div style="font-family:'Noto Serif Lao',serif;font-size:1.1rem;font-weight:700;color:#0f4530">${R.en}</div>
+      <div style="font-size:.9rem;font-weight:600;color:${col};margin:2px 0">${R.lo}</div>
+      <div style="font-size:.72rem;color:#666;line-height:1.7">${R.addrEn}<br>${R.addrLo}<br>📞 ${R.t1} | ${R.t2}<br>✉️ ${R.email}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="background:${bg};border-radius:10px;padding:8px 14px;border-left:4px solid ${col}">
+        <div style="font-size:.68rem;color:${col};font-weight:700">${dTitleEn}</div>
+        <div style="font-family:'Noto Serif Lao',serif;font-size:1rem;font-weight:700;color:${col}">${dTitle}</div>
+        <div style="font-size:.7rem;color:#888;margin-top:2px">${dNum}</div>
+      </div>
+      <div style="text-align:right;font-size:.75rem;color:#666">
+        <div style="font-weight:600">ວັນທີ / Date</div>
+        <div>${fd(today())}</div>
+      </div>
+    </div>
+    ${isQuo?'<div style="background:#fffbf0;border:1px solid #f0c040;border-radius:8px;padding:8px 12px;font-size:.75rem;color:#7a5a00;margin-bottom:12px">⏳ ໃບສະເໜີນີ້ມີຜົນ 7 ວັນ ນັບຈາກວັນທີອອກ</div>':''}
+    <div class="ig">
+      <div>
+        <div class="il">ຊື່ແຂກ / Guest</div>
+        <div class="iv">${inv.guest}</div>
+        ${inv.phone?`<div style="font-size:.78rem;color:#666">📞 ${inv.phone}</div>`:''}
+        ${inv.nation?`<div style="font-size:.78rem;color:#666">🌏 ${inv.nation}</div>`:''}
+      </div>
+      <div>
+        <div class="il">ໄລຍະ / Period</div>
+        <div style="font-size:.82rem;font-weight:600;margin-top:2px">
+          <div>ເຂົ້າ: ${fd(ci0)}</div><div>ອອກ: ${fd(co0)}</div>
+          <div style="color:${col}">${inv.rooms.reduce((s,r)=>s+r.nights,0)} ຄືນລວມ</div>
+        </div>
+      </div>
+    </div>
+    ${inv.note?`<div style="background:#f9f9f6;border-radius:8px;padding:8px 10px;font-size:.78rem;color:#555;margin-bottom:12px;border-left:3px solid #ccc">📝 ${inv.note}</div>`:''}
+    <table class="it">
+      <thead><tr>
+        <th>ຫ້ອງ</th><th>ວັນທີ</th>
+        <th style="text-align:center">ຄືນ</th>
+        <th style="text-align:right">ລາຄາ/ຄືນ</th>
+        <th style="text-align:right">ລວມ(ກີບ)</th>
+      </tr></thead>
+      <tbody>${inv.rooms.map(r=>`<tr>
+        <td>${r.id}<br><small style="color:#888">${r.type}</small></td>
+        <td style="font-size:.73rem">${fd(r.checkin)}<br>→ ${fd(r.checkout)}</td>
+        <td style="text-align:center">${r.nights}</td>
+        <td style="text-align:right">${fk(r.price)}</td>
+        <td style="text-align:right;font-weight:600">${fk(r.amt)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="itot">
+      <div class="itr"><span>ລວມ / Subtotal</span><span>${fk(inv.subtotal)} ກີບ</span></div>
+      ${inv.discount>0?`<div class="itr" style="color:var(--red)"><span>ສ່ວນຫຼຸດ</span><span>-${fk(inv.discount)} ກີບ</span></div>`:''}
+      <div class="itr grand" style="color:${col}"><span>💰 ລວມທັງໝົດ / TOTAL</span><span>${fk(inv.total)} ກີບ</span></div>
+    </div>
+    <div style="margin-top:14px;border-radius:10px;overflow:hidden;border:1.5px solid ${col};font-size:.82rem">
+      <div style="background:${col};color:#fff;padding:7px 12px;font-weight:700;font-size:.78rem">💳 ການຊຳລະເງິນ / PAYMENT SCHEDULE</div>
+      <div style="padding:10px 12px;background:#fff">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #ddd">
+          <div><div style="font-weight:700;color:${col}">1. ເງິນມັດຈຳ (50%)</div><div style="font-size:.72rem;color:#888">ຊຳລະທັນທີ ເພື່ອຢືນຢັນການຈອງ</div></div>
+          <div style="font-weight:700;font-size:1rem;color:${col};white-space:nowrap;margin-left:8px">${fk(dep)} ກີບ</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <div><div style="font-weight:700;color:#555">2. ຍອດຄ້າງຊຳລະ (50%)</div><div style="font-size:.72rem;color:#888">ຊຳລະໃນວັນ Check-in (${fd(ci0)})</div></div>
+          <div style="font-weight:700;font-size:1rem;color:#555;white-space:nowrap;margin-left:8px">${fk(bal)} ກີບ</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;background:#f7f9f7;border-radius:8px;font-size:.72rem;color:#444;border:1px solid #c8dcc8;line-height:1.8">
+      <div style="font-weight:700;color:#0f4530;margin-bottom:6px;font-size:.78rem">📋 ເງື່ອນໄຂ ແລະ ນະໂຍບາຍການຍົກເລີກ</div>
+      • ຜູ້ຈອງຕ້ອງໂອນເງິນມັດຈຳ 50% ເພື່ອຢືນຢັນ<br>
+      • ຍົກເລີກ <strong>ເກີນ 7 ວັນ</strong> ກ່ອນເຂົ້າພັກ: ຄືນເງິນທັງໝົດ<br>
+      • ຍົກເລີກ <strong>3–7 ວັນ</strong> ກ່ອນເຂົ້າພັກ: ຫັກ 20% ຂອງເງິນມັດຈຳ<br>
+      • ຍົກເລີກ <strong>ພາຍໃນ 2 ວັນ</strong> ກ່ອນເຂົ້າພັກ: ຫັກເງິນມັດຈຳທັງໝົດ
+    </div>
+    <div class="isig">
+      <div><div class="sigline">ລາຍເຊັນລູກຄ້າ<br>Guest Signature</div></div>
+      <div style="text-align:center;min-width:140px">
+        ${SIG}
+        <div style="border-top:1.5px solid #555;padding-top:4px;font-size:.72rem;color:#333;font-weight:600">Phouvanh Oudomvilay</div>
+        <div style="font-size:.68rem;color:#666">ຜູ້ຈັດການຣີສອດ · Resort Manager</div>
+        <div style="font-size:.65rem;color:#999">Nam Song View Garden Resort</div>
+      </div>
+    </div>
+    <div class="ifooter">
+      ຂໍຂອບໃຈທີ່ໃຊ້ບໍລິການ! Thank you for choosing us! 🙏<br>
+      <strong>${R.en}</strong> · Vang Vieng, Lao PDR<br>
+      📞 ${R.t1} | ${R.t2} · ✉️ ${R.email}
+    </div>`;
+
+  document.getElementById('invEmpty').style.display='none';
+  document.getElementById('invContent').style.display='block';
+}
+
+// ═══════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════
+function renderHistory(){
+  const s=(document.getElementById('srchInput')?.value||'').toLowerCase();
+  const d=document.getElementById('srchDate')?.value;
+  const el=document.getElementById('histList'); if(!el) return;
+  const list=(window.bookings||[]).filter(b=>{
+    const nm=b.guest.toLowerCase().includes(s);
+    const dt=!d||(b.rooms||[]).some(r=>r.checkin===d||r.checkout===d);
+    return nm&&dt;
+  });
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="empty-ic">📁</div><p>ຍັງບໍ່ມີປະຫວັດ</p></div>`;return;}
+  el.innerHTML=list.map(b=>{
+    const ci=(b.rooms||[]).map(r=>r.checkin).sort()[0];
+    const co=(b.rooms||[]).map(r=>r.checkout).sort().reverse()[0];
+    return`<div class="bk">
+      <div class="bkh">
+        <div class="bkg" onclick="viewBk('${b._fk||b.id}')">👤 ${b.guest}</div>
+        <div class="bkt">${fk(b.total)} ກີບ</div>
+      </div>
+      <div class="bkm" onclick="viewBk('${b._fk||b.id}')">
+        🏠 ${(b.rooms||[]).length} ຫ້ອງ · 📅 ${fd(ci)} → ${fd(co)} ${b.nation?'· 🌏'+b.nation:''}
+      </div>
+      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:.72rem;color:#aaa">${b.invNum} · ${fd((b.createdAt||'').split('T')[0])}</div>
+        <button onclick="delBooking('${b._fk}')" style="background:#fff0ee;border:1px solid #f0a898;color:var(--red);border-radius:8px;padding:3px 8px;font-size:.72rem;cursor:pointer;font-family:'Noto Sans Lao',sans-serif">🗑️ ລຶບ</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function viewBk(key){
+  const b=(window.bookings||[]).find(x=>(x._fk||x.id)==key);
+  if(!b) return;
+  curInv=b; isQuo=false; renderInv(); goTab('invoice');
+}
+
+// ═══════════════════════════════════════
+// PRINT / SHARE
+// ═══════════════════════════════════════
+function doPrint(){
+  document.getElementById('printArea').innerHTML=
+    `<div style="font-family:'Noto Sans Lao',sans-serif;padding:20px;max-width:600px;margin:0 auto">
+      ${document.getElementById('invPreview').innerHTML}
+    </div>`;
+  window.print();
+}
+function doShare(){
+  const txt=buildTxt(curInv);
+  if(navigator.share) navigator.share({title:isQuo?'ໃບສະເໜີລາຄາ':'ໃບເກັບເງິນ',text:txt});
+  else navigator.clipboard.writeText(txt).then(()=>toast('📋 ຄັດລອກແລ້ວ!'));
+}
+function buildTxt(inv){
+  if(!inv) return '';
+  const ci0=inv.rooms.map(r=>r.checkin).sort()[0];
+  let t=`🌿 ${R.en}\n${R.lo}\n📞 ${R.t1} | ${R.t2}\n${'='.repeat(32)}\n`;
+  t+=isQuo?'📄 ໃບສະເໜີລາຄາ\n':'🧾 ໃບເກັບເງິນ\n';
+  t+=`${isQuo?inv.invNum.replace('INV-','QUO-'):inv.invNum}\nວັນທີ: ${fd(today())}\nແຂກ: ${inv.guest}\n`;
+  if(inv.phone) t+=`ໂທ: ${inv.phone}\n`;
+  t+=`${'='.repeat(32)}\n`;
+  inv.rooms.forEach(r=>{ t+=`🏠 ${r.id} (${r.type})\n   ${fd(r.checkin)} → ${fd(r.checkout)} (${r.nights} ຄືນ)\n   ${fk(r.price)} × ${r.nights} = ${fk(r.amt)} ກີບ\n`; });
+  t+=`${'='.repeat(32)}\n`;
+  if(inv.discount>0) t+=`ສ່ວນຫຼຸດ: -${fk(inv.discount)} ກີບ\n`;
+  t+=`💰 ລວມ: ${fk(inv.total)} ກີບ\n💳 ມັດຈຳ (50%): ${fk(Math.round(inv.total*.5))} ກີບ\n💳 ຄ້າງ (50%): ${fk(inv.total-Math.round(inv.total*.5))} ກີບ (Check-in ${fd(ci0)})\n\nຂໍຂອບໃຈ! 🙏`;
+  return t;
+}
+
+// ═══════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════
+function nights(a,b){ const d=Math.round((new Date(b)-new Date(a))/86400000); return d>0?d:0; }
+function fk(n){ return(n||0).toLocaleString('en-US'); }
+function fd(d){ if(!d) return''; const p=d.split('-'); return`${p[2]}/${p[1]}/${p[0]}`; }
+function today(){ return new Date().toISOString().split('T')[0]; }
+function toast(m){
+  const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function init(){
+  document.getElementById('dashDate').value=today();
+  renderRoomGrid();
+  if(sessionStorage.getItem('ok')==='1'){
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('app').style.display='block';
+  }
+  window._appReady=true;
+}
+init();
+</script>
+
+<!--
+╔══════════════════════════════════════════════════════════════════╗
+║     📖  STEP-BY-STEP GUIDE: FIREBASE + NETLIFY SETUP            ║
+║     (This is a comment — users cannot see this)                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  PART 1 — FIREBASE (the database where bookings are stored)      ║
+║  ─────────────────────────────────────────────────────────────   ║
+║  STEP 1: Open https://console.firebase.google.com               ║
+║          Sign in with your Google account                        ║
+║                                                                  ║
+║  STEP 2: Click "Add project"                                     ║
+║          • Name: namsongview                                     ║
+║          • Turn OFF Google Analytics                             ║
+║          • Click "Create project" → wait → "Continue"           ║
+║                                                                  ║
+║  STEP 3: Create the database                                     ║
+║          • Left menu → Build → Realtime Database                 ║
+║          • Click "Create Database"                               ║
+║          • Location: asia-southeast1 (Singapore) ← closest       ║
+║          • Choose "Start in TEST mode" → Enable                  ║
+║                                                                  ║
+║  STEP 4: Set security rules                                      ║
+║          • Click the "Rules" tab                                 ║
+║          • Delete all text, paste this exactly:                  ║
+║            {                                                     ║
+║              "rules": {                                          ║
+║                ".read": true,                                    ║
+║                ".write": true                                    ║
+║              }                                                   ║
+║            }                                                     ║
+║          • Click "Publish"                                       ║
+║                                                                  ║
+║  STEP 5: Get your config code                                    ║
+║          • Click gear icon ⚙️ → "Project settings"              ║
+║          • Scroll to "Your apps" → click </> (Web icon)          ║
+║          • Nickname: namsongview-app                             ║
+║          • Do NOT check "Firebase Hosting"                       ║
+║          • Click "Register app"                                  ║
+║          • You will see code like:                               ║
+║            apiKey: "AIzaSy...",                                  ║
+║            authDomain: "namsongview.firebaseapp.com",            ║
+║            databaseURL: "https://namsongview-default-rtdb...",   ║
+║            projectId: "namsongview",                             ║
+║            ...                                                   ║
+║          • In THIS file, find the firebaseConfig block near      ║
+║            the top and replace every "PASTE_…_HERE" value        ║
+║            with your real values (keep the quotes " " around     ║
+║            each value)                                           ║
+║                                                                  ║
+║  ─────────────────────────────────────────────────────────────   ║
+║  PART 2 — NETLIFY (the website hosting, free)                    ║
+║  ─────────────────────────────────────────────────────────────   ║
+║  STEP 6: Open https://app.netlify.com                           ║
+║          Sign up / log in with Google                            ║
+║                                                                  ║
+║  STEP 7: Click "Add new site" → "Deploy manually"               ║
+║          Drag and drop THIS HTML file onto the grey box          ║
+║          Wait about 30 seconds                                   ║
+║                                                                  ║
+║  STEP 8: Netlify gives you a link like:                         ║
+║          https://wonderful-name-123456.netlify.app              ║
+║          Share this link with all family members and staff!      ║
+║                                                                  ║
+║  STEP 9 (optional): Custom domain name                          ║
+║          • In Netlify: Site settings → Domain management         ║
+║          • You can rename to e.g. namsongview.netlify.app        ║
+║          • Or buy a real domain (~$12/year) at namecheap.com     ║
+║                                                                  ║
+║  ─────────────────────────────────────────────────────────────   ║
+║  PART 3 — FIRST USE                                              ║
+║  ─────────────────────────────────────────────────────────────   ║
+║  STEP 10: Open the link on your phone                           ║
+║           Default PIN is: 1234                                   ║
+║           Tap "ປ່ຽນ PIN" to change it                           ║
+║           All family members use the same PIN                    ║
+║                                                                  ║
+║  ✅ DONE! All bookings now sync in real-time across all phones   ║
+╚══════════════════════════════════════════════════════════════════╝
+-->
+</body>
+</html>
