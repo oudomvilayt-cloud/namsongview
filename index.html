@@ -169,6 +169,18 @@ textarea{resize:vertical;min-height:70px}
 .dbt{flex:1;padding:10px 8px;border-radius:10px;font-family:'Noto Sans Lao',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;border:2px solid var(--bdr);background:#fff;color:var(--muted);transition:all .2s}
 .dbta{background:var(--gr);color:#fff;border-color:var(--gr)}
 
+/* ── SIGNATURE UPLOAD ── */
+.sig-upload{background:#fff;border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:var(--sh);border:1px solid rgba(212,201,176,.4)}
+.sig-preview{text-align:center;margin:10px 0}
+.sig-preview img{max-width:200px;max-height:80px;border:1px dashed var(--bdr);border-radius:8px;padding:6px;background:#fafaf7}
+.sig-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sig-actions label,.sig-actions button{display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:10px;font-family:'Noto Sans Lao',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
+.sig-upload-btn{background:var(--gr);color:#fff;border:none}
+.sig-upload-btn:active{transform:scale(.97)}
+.sig-clear-btn{background:#fff0ee;color:var(--red);border:1px solid #f0a898}
+.sig-clear-btn:active{transform:scale(.97)}
+#sigFileInput{display:none}
+
 /* ── DASHBOARD ── */
 .dnav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .dnav input{flex:1;margin-bottom:0}
@@ -348,6 +360,22 @@ textarea{resize:vertical;min-height:70px}
 
 <!-- ─── INVOICE ─── -->
 <div id="tab-invoice" class="sec">
+  <!-- SIGNATURE UPLOAD SECTION -->
+  <div class="sig-upload noprint">
+    <div class="ct">✍️ ລາຍເຊັນຜູ້ຈັດການ <div class="ctl"></div></div>
+    <div class="sig-preview" id="sigPreview">
+      <p style="font-size:.8rem;color:var(--muted)">ຍັງບໍ່ໄດ້ອັບໂຫລດລາຍເຊັນ</p>
+    </div>
+    <div class="sig-actions">
+      <label class="sig-upload-btn">
+        📷 ອັບໂຫລດລາຍເຊັນ
+        <input type="file" id="sigFileInput" accept="image/*" onchange="handleSigUpload(this)">
+      </label>
+      <button class="sig-clear-btn" onclick="clearSignature()" id="sigClearBtn" style="display:none">✕ ລຶບລາຍເຊັນ</button>
+    </div>
+    <div class="tip" style="margin-top:10px">💡 ອັບໂຫລດຮູບລາຍເຊັນ 1 ຄັ້ງ, ຈະໃຊ້ໃນທຸກໃບເກັບເງິນ. ແນະນຳ: ຮູບ PNG ພື້ນໃສ.</div>
+  </div>
+
   <div id="invEmpty" class="empty">
     <div class="empty-ic">🧾</div>
     <p>ຍັງບໍ່ໄດ້ສ້າງໃບເກັບເງິນ<br>ໄປທີ່ "ຈອງຫ້ອງ" ກ່ອນ</p>
@@ -413,6 +441,49 @@ window.bookings=[];
 let selRooms={}, curInv=null, isQuo=false, bld='all', pinBuf='';
 
 // ═══════════════════════════════════════
+// SIGNATURE UPLOAD (localStorage)
+// ═══════════════════════════════════════
+function getSignature(){
+  const saved=localStorage.getItem('nsv_signature');
+  if(saved) return `<img src="${saved}" style="display:block;margin:0 auto 2px;max-width:200px;max-height:60px">`;
+  return `<div style="height:40px;display:flex;align-items:flex-end;justify-content:center;color:#ccc;font-size:.72rem;font-style:italic">( ຍັງບໍ່ໄດ້ອັບໂຫລດລາຍເຊັນ )</div>`;
+}
+function handleSigUpload(input){
+  const file=input.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){toast('⚠️ ກະລຸນາເລືອກໄຟລ໌ຮູບພາບ');return;}
+  if(file.size>2*1024*1024){toast('⚠️ ຮູບໃຫຍ່ເກີນໄປ (ສູງສຸດ 2MB)');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    localStorage.setItem('nsv_signature',e.target.result);
+    renderSigPreview();
+    if(curInv) renderInv();
+    toast('✅ ບັນທຶກລາຍເຊັນສຳເລັດ!');
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function clearSignature(){
+  if(!confirm('ລຶບລາຍເຊັນແທ້ບໍ?')) return;
+  localStorage.removeItem('nsv_signature');
+  renderSigPreview();
+  if(curInv) renderInv();
+  toast('🗑️ ລຶບລາຍເຊັນແລ້ວ');
+}
+function renderSigPreview(){
+  const saved=localStorage.getItem('nsv_signature');
+  const el=document.getElementById('sigPreview');
+  const clrBtn=document.getElementById('sigClearBtn');
+  if(saved){
+    el.innerHTML=`<img src="${saved}" style="max-width:200px;max-height:80px;border:1px dashed var(--bdr);border-radius:8px;padding:6px;background:#fafaf7">`;
+    clrBtn.style.display='inline-flex';
+  } else {
+    el.innerHTML=`<p style="font-size:.8rem;color:var(--muted)">ຍັງບໍ່ໄດ້ອັບໂຫລດລາຍເຊັນ</p>`;
+    clrBtn.style.display='none';
+  }
+}
+
+// ═══════════════════════════════════════
 // PIN
 // ═══════════════════════════════════════
 function pp(d){
@@ -458,6 +529,7 @@ function showTab(name,btn){
   if(btn) btn.classList.add('active');
   if(name==='history') renderHistory();
   if(name==='dashboard') renderDashboard();
+  if(name==='invoice') renderSigPreview();
 }
 function goTab(name){
   const tabs=['booking','dashboard','invoice','history'];
@@ -465,6 +537,7 @@ function goTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.querySelectorAll('.tab')[tabs.indexOf(name)]?.classList.add('active');
+  if(name==='invoice') renderSigPreview();
   window.scrollTo(0,0);
 }
 
@@ -520,7 +593,6 @@ function renderDashboard(){
   if(!events.length){
     al.innerHTML=`<div class="empty" style="padding:20px"><div class="empty-ic" style="font-size:2rem">😴</div><p>ບໍ່ມີການເຂົ້າ-ອອກ ວັນທີ ${fd(date)}</p></div>`;
   } else {
-    // de-duplicate
     const seen=new Set();
     const uniq=events.filter(e=>{const k=e.t+e.guest+e.room;if(seen.has(k))return false;seen.add(k);return true;});
     al.innerHTML=uniq.map(e=>`
@@ -665,23 +737,6 @@ function setSyncing(v){ document.getElementById('syncDot').className='hdr-sync n
 // ═══════════════════════════════════════
 // INVOICE RENDER
 // ═══════════════════════════════════════
-const SIG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60" style="display:block;margin:0 auto 2px">
-  <g fill="none" stroke="#1a1a1a" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M14,48 C13,38 13,26 15,17 C16,13 18,10 21,10 C25,9 29,13 28,19 C27,25 23,28 18,28 C15,28 13,27 13,26" stroke-width="2.1"/>
-    <path d="M13,48 C14,42 16,36 18,32 C20,28 23,26 26,27 C29,28 29,34 29,43 L29,48" stroke-width="1.8"/>
-    <path d="M29,35 C31,29 35,27 38,28 C41,30 41,36 41,43 L41,48" stroke-width="1.8"/>
-    <path d="M45,37 C45,31 47,28 51,28 C55,28 57,32 57,37 C57,43 55,47 51,47 C47,47 45,43 45,39" stroke-width="1.8"/>
-    <path d="M60,28 L60,40 C60,44 62,47 65,46 C68,45 69,41 69,37 L69,28" stroke-width="1.8"/>
-    <path d="M72,28 L76,46 L80,28" stroke-width="1.8"/>
-    <path d="M88,36 C87,30 89,28 93,28 C97,28 99,32 98,37 C97,42 95,46 92,46 C89,46 87,44 88,41 L88,48" stroke-width="1.8"/>
-    <path d="M101,28 L101,48" stroke-width="1.8"/>
-    <path d="M101,36 C103,30 107,28 110,29 C113,30 114,35 114,42 L114,48" stroke-width="1.8"/>
-    <path d="M117,12 L117,48" stroke-width="1.8"/>
-    <path d="M117,36 C119,30 123,28 126,29 C129,30 130,35 130,42 L130,48" stroke-width="1.8"/>
-    <path d="M11,53 C45,59 92,60 133,56 C148,54 158,51 165,47 C170,45 173,42 171,40 C169,38 164,39 161,42" stroke-width="1.4" opacity=".65"/>
-  </g>
-</svg>`;
-
 function renderInv(){
   if(!curInv) return;
   const inv=curInv;
@@ -772,7 +827,7 @@ function renderInv(){
     <div class="isig">
       <div><div class="sigline">ລາຍເຊັນລູກຄ້າ<br>Guest Signature</div></div>
       <div style="text-align:center;min-width:140px">
-        ${SIG}
+        ${getSignature()}
         <div style="border-top:1.5px solid #555;padding-top:4px;font-size:.72rem;color:#333;font-weight:600">Phouvanh Oudomvilay</div>
         <div style="font-size:.68rem;color:#666">ຜູ້ຈັດການຣີສອດ · Resort Manager</div>
         <div style="font-size:.65rem;color:#999">Nam Song View Garden Resort</div>
@@ -873,6 +928,7 @@ function toast(m){
 function init(){
   document.getElementById('dashDate').value=today();
   renderRoomGrid();
+  renderSigPreview();
   if(sessionStorage.getItem('ok')==='1'){
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('app').style.display='block';
@@ -881,86 +937,5 @@ function init(){
 }
 init();
 </script>
-
-<!--
-╔══════════════════════════════════════════════════════════════════╗
-║     📖  STEP-BY-STEP GUIDE: FIREBASE + NETLIFY SETUP            ║
-║     (This is a comment — users cannot see this)                  ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  PART 1 — FIREBASE (the database where bookings are stored)      ║
-║  ─────────────────────────────────────────────────────────────   ║
-║  STEP 1: Open https://console.firebase.google.com               ║
-║          Sign in with your Google account                        ║
-║                                                                  ║
-║  STEP 2: Click "Add project"                                     ║
-║          • Name: namsongview                                     ║
-║          • Turn OFF Google Analytics                             ║
-║          • Click "Create project" → wait → "Continue"           ║
-║                                                                  ║
-║  STEP 3: Create the database                                     ║
-║          • Left menu → Build → Realtime Database                 ║
-║          • Click "Create Database"                               ║
-║          • Location: asia-southeast1 (Singapore) ← closest       ║
-║          • Choose "Start in TEST mode" → Enable                  ║
-║                                                                  ║
-║  STEP 4: Set security rules                                      ║
-║          • Click the "Rules" tab                                 ║
-║          • Delete all text, paste this exactly:                  ║
-║            {                                                     ║
-║              "rules": {                                          ║
-║                ".read": true,                                    ║
-║                ".write": true                                    ║
-║              }                                                   ║
-║            }                                                     ║
-║          • Click "Publish"                                       ║
-║                                                                  ║
-║  STEP 5: Get your config code                                    ║
-║          • Click gear icon ⚙️ → "Project settings"              ║
-║          • Scroll to "Your apps" → click </> (Web icon)          ║
-║          • Nickname: namsongview-app                             ║
-║          • Do NOT check "Firebase Hosting"                       ║
-║          • Click "Register app"                                  ║
-║          • You will see code like:                               ║
-║            apiKey: "AIzaSy...",                                  ║
-║            authDomain: "namsongview.firebaseapp.com",            ║
-║            databaseURL: "https://namsongview-default-rtdb...",   ║
-║            projectId: "namsongview",                             ║
-║            ...                                                   ║
-║          • In THIS file, find the firebaseConfig block near      ║
-║            the top and replace every "PASTE_…_HERE" value        ║
-║            with your real values (keep the quotes " " around     ║
-║            each value)                                           ║
-║                                                                  ║
-║  ─────────────────────────────────────────────────────────────   ║
-║  PART 2 — NETLIFY (the website hosting, free)                    ║
-║  ─────────────────────────────────────────────────────────────   ║
-║  STEP 6: Open https://app.netlify.com                           ║
-║          Sign up / log in with Google                            ║
-║                                                                  ║
-║  STEP 7: Click "Add new site" → "Deploy manually"               ║
-║          Drag and drop THIS HTML file onto the grey box          ║
-║          Wait about 30 seconds                                   ║
-║                                                                  ║
-║  STEP 8: Netlify gives you a link like:                         ║
-║          https://wonderful-name-123456.netlify.app              ║
-║          Share this link with all family members and staff!      ║
-║                                                                  ║
-║  STEP 9 (optional): Custom domain name                          ║
-║          • In Netlify: Site settings → Domain management         ║
-║          • You can rename to e.g. namsongview.netlify.app        ║
-║          • Or buy a real domain (~$12/year) at namecheap.com     ║
-║                                                                  ║
-║  ─────────────────────────────────────────────────────────────   ║
-║  PART 3 — FIRST USE                                              ║
-║  ─────────────────────────────────────────────────────────────   ║
-║  STEP 10: Open the link on your phone                           ║
-║           Default PIN is: 1234                                   ║
-║           Tap "ປ່ຽນ PIN" to change it                           ║
-║           All family members use the same PIN                    ║
-║                                                                  ║
-║  ✅ DONE! All bookings now sync in real-time across all phones   ║
-╚══════════════════════════════════════════════════════════════════╝
--->
 </body>
 </html>
